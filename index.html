@@ -202,25 +202,21 @@
 <div id="pdf-container"></div>
 
 <script>
-
-<script>
-// 2. Tu configuración de Firebase
+// 1. CONFIGURACIÓN DE FIREBASE (Copiada de tu consola)
     const firebaseConfig = {
-      apiKey: "AIzaSyCWixk-nH5JEI34IvkYYyPx7D-VUMYXwi8",
-      authDomain: "coro-joven-iglesia-en-mengibar.firebaseapp.com",
-      databaseURL: "https://coro-joven-iglesia-en-mengibar-default-rtdb.europe-west1.firebasedatabase.app",
-      projectId: "coro-joven-iglesia-en-mengibar",
-      storageBucket: "coro-joven-iglesia-en-mengibar.firebasestorage.app",
-      messagingSenderId: "9046050722",
-      appId: "1:9046050722:web:584918152a588bb42014fb",
-      measurementId: "G-R9YMD9R6K1"
+        apiKey: "AIzaSyCWixk-nH5JEI34IvkYYyPx7D-VUMYXwi8",
+        authDomain: "coro-joven-iglesia-en-mengibar.firebaseapp.com",
+        databaseURL: "https://coro-joven-iglesia-en-mengibar-default-rtdb.europe-west1.firebasedatabase.app",
+        projectId: "coro-joven-iglesia-en-mengibar",
+        storageBucket: "coro-joven-iglesia-en-mengibar.firebasestorage.app",
+        messagingSenderId: "9046050722",
+        appId: "1:9046050722:web:584918152a588bb42014fb",
+        measurementId: "G-R9YMD9R6K1"
     };
 
-    // 3. Inicializa Firebase usando el objeto global 'firebase' que cargaste en el HTML
+    // 2. INICIALIZACIÓN COMPATIBLE (Para las librerías gstatic v9.1.3 de tu <head>)
     firebase.initializeApp(firebaseConfig);
-
-    // 4. Define la variable 'db' llamando al servicio de base de datos
-    const db = firebase.database();
+    const db = firebase.database(); // Aquí definimos 'db' globalmente
 
     const PASS_CANTO = "canto2026"; // Contraseña de Canto
     const PASS_INSTRU = "instru2026"; // Contraseña de Instrumento
