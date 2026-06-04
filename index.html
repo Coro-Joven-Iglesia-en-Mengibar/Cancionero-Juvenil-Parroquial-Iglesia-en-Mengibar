@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2c3e50">
+
+    <link rel="icon" type="image/svg+xml" href="Logo Coro Juvenil.svg">
+    <link rel="apple-touch-icon" href="Logo Coro Juvenil.svg">
+    
+    <title>Cancionero Joven Mengíbar</title>
+
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    
+    <style>
+        * { box-sizing: border-box; }
+        :root { --p: #2c3e50; --s: #27ae60; --a: #f39c12; --d: #e74c3c; --l: #ffffff; --bg: #f4f7f6; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); margin: 0; color: #333; padding-bottom: 70px; overflow-x: hidden; }
+        .logo-main { width: 140px; margin-bottom: 20px; }
+        #gatekeeper { position: fixed; inset: 0; background: #840202 ; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1000; padding: 20px; text-align: center; }
+        nav { position: fixed; bottom: 0; width: 100%; background: white; display: flex; border-top: 1px solid #ddd; z-index: 500; height: 65px; }
+        nav button { flex: 1; border: none; background: none; font-size: 11px; font-weight: bold; color: #999; }
+        nav button.active { color: var(--p); border-top: 4px solid var(--p); }
+        .container { max-width: 800px; margin: 0 auto; padding: 15px; }
+        .section { display: none; }
+        .section.active { display: block; }
+        .song-display { background: white; color: black; padding: 25px; border-radius: 12px; border: 1px solid #eee; font-family: 'Fira Code', monospace; line-height: 1.6; min-height: 300px; }
+        .mode-instru .song-display { font-size: clamp(12px, 2.5vw, 16px); white-space: pre-wrap; }
+        .mode-canto .song-display { font-size: clamp(14px, 3vw, 18px); white-space: pre-wrap; }
+        .editor-box { background: white; border: 1px solid #ccc; min-height: 200px; padding: 15px; font-family: 'Fira Code', monospace; outline: none; border-radius: 8px; white-space: pre-wrap; margin-bottom: 15px;}
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #eee; }
+        .btn { padding: 12px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin: 5px 0; }
+        .btn-ok { background: var(--p); color: white; }
+        .btn-action { background: var(--s); color: white; }
+        .btn-cancel { background: #eee; color: #555; }
+        .tag { font-size: 10px; background: #e8f4f8; padding: 4px 8px; border-radius: 4px; color: var(--p); font-weight: bold; }
+        input, select { padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 10px; width: 100%; box-sizing: border-box; }
+        #pdf-container { 
+            display: none; 
+            background: white !important; /* Forzamos fondo blanco */
+            color: black !important;      /* Forzamos texto negro */
+            padding: 20px; 
+            font-family: 'Fira Code', monospace; 
+        }
+        /* Añade esto para asegurar que dentro del PDF todo sea negro */
+        #pdf-container * {
+            color: black !important;
+            background: transparent !important;
+        }
+        .admin-only, .instru-only { display: none; }
+        .handle, .handle-style { user-select: none; -webkit-user-drag: none; cursor: grab; }
+
+        /* --- ESTILOS MODO OSCURO --- */
+        body.dark-mode { background: #000000; color: #e0e0e0; }
+        body.dark-mode .card, 
+        body.dark-mode .song-display, 
+        body.dark-mode .editor-box {
+            background-color: #000000 !important; /* Negro absoluto */
+            border: 1px solid #444444 !important; /* Gris medio (puedes usar #333 si lo quieres más oscuro) */
+            color: #e0e0e0 !important;           /* Texto gris claro para no deslumbrar */
+        }
+        body.dark-mode nav, 
+        body.dark-mode #log-list, 
+
+        
+        
+        body.dark-mode .admin-only[style*="background:#fff"] { background: #1e1e1e !important; border-color: #333 !important; }
+        body.dark-mode input, 
+        body.dark-mode select { background: #2c2c2c; color: #e0e0e0; border-color: #444; }
+        body.dark-mode .tag { background: #2c3e50; color: #ecf0f1; }
+        body.dark-mode nav button.active { color: #840202 !important; border-top: 4px solid #840202 !important; }
+        body.dark-mode .btn-cancel { background: #333 !important; color: #ddd !important; border-color: #444 !important; }
+    </style>
+</head>
+<body class="mode-canto">
+
+<div id="gatekeeper">
+    <img src="Logo Coro Juvenil (W).svg" class="logo-main">
+    <h2>Cancionero Juvenil Parroquial</h2>
+    <h3>Iglesia en Mengíbar</h3>
+    <input type="password" id="pass-entrada" placeholder="Contraseña...">
+    <button onclick="checkAccess()" class="btn btn-ok" style="width:200px">Entrar</button>
+</div>
+
+<img src="Logo Coro Juvenil.svg" id="app-logo" style="position:fixed; top:15px; right:15px; width:35px; z-index:1000; display:none;">
+ 
+<div class="container" id="main-content" style="display:none">
+    
+    <div id="sec-songs" class="section active">
+        <h3>📚 Repertorio</h3>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <input type="text" id="search" placeholder="🔍 Buscar..." onkeyup="renderSongsList()" style="margin:0; flex:2;">
+            <select id="filter-style" onchange="renderSongsList()" style="margin:0; flex:1;">
+                <option value="Todos">Todos</option>
+            </select>
+        </div>
+        <div style="display:flex; gap:5px">
+            <button class="admin-only btn btn-ok" onclick="openSongForm()">+ Nueva</button>
+            <button class="btn btn-action" onclick="generateAllPDF()">📄 PDF Completo</button>
+        </div>
+        <div id="list-songs"></div>
+    </div>
+
+    <div id="sec-misas" class="section">
+        <h3>⛪ Misas</h3>
+        <div id="list-misas"></div>
+        <button class="admin-only btn btn-ok" onclick="createNewMisa()">+ Crear Misa</button>
+    </div>
+
+    <div id="sec-misa-detail" class="section">
+        <button onclick="showSection('misas')" class="btn btn-cancel" style="width:auto">⬅ Volver</button>
+        <h2 id="misa-name"></h2>
+        <div style="display:flex; gap:5px">
+            <button class="btn btn-action" onclick="generateMisaPDF('list')">PDF Lista</button>
+            <button class="btn btn-action" onclick="generateMisaPDF('both')">PDF Letras</button>
+        </div>
+        <div id="misa-songs-order"></div>
+        <div class="admin-only" style="background:#fff; padding:15px; border-radius:10px; border:1px solid #ddd; margin-top:20px;">
+            <h4>Gestionar Canto</h4>
+            
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <input type="text" id="search-misa" placeholder="🔍 Buscar..." onkeyup="updateMisaSongSelector()" style="margin:0; flex:2;">
+                <select id="filter-style-misa" onchange="updateMisaSongSelector()" style="margin:0; flex:1;">
+                    <option value="Todos">Todos</option>
+                </select>
+            </div>
+
+            <select id="song-to-add"></select>
+            <button onclick="addSongToMisa()" class="btn btn-ok">Añadir a la lista</button>
+            <button onclick="deleteMisa()" class="btn" style="color:red; background:none">Eliminar Misa</button>
+        </div>
+    </div>
+
+    <div id="sec-view-song" class="section">
+        <button onclick="goBack()" class="btn btn-cancel" style="width:auto">⬅ Volver</button>
+        <div style="display:flex; justify-content:space-between; align-items:center">
+            <h2 id="v-title"></h2>
+            <button class="btn btn-action" onclick="downloadSinglePDF()" style="width:auto">📄 PDF</button>
+        </div>
+        <span id="v-tag" class="tag"></span> <span id="v-cejilla" class="tag instru-only" style="background:var(--a); color:white"></span>
+        <div id="v-content" class="song-display" style="margin-top:15px"></div>
+        <div class="admin-only">
+            <button class="btn" onclick="editSong()" style="background:var(--a); color:white">✏️ Editar</button>
+        </div>
+    </div>
+
+    <div id="sec-form-song" class="section">
+        <h3>Editor</h3>
+        <input type="text" id="f-title" placeholder="Título">
+        <input type="number" id="f-cejilla" placeholder="Cejilla">
+        <select id="f-style"></select>
+        <div id="f-content-canto" class="editor-box" contenteditable="true"></div>
+        <div id="f-content-instru" class="editor-box" contenteditable="true"></div>
+        <button onclick="saveSong()" class="btn btn-ok">💾 Sincronizar Nube</button>
+        <button onclick="showSection('songs')" class="btn btn-cancel">Cancelar</button>
+        <button onclick="deleteSong()" class="admin-only btn" style="background:none; color:red; margin-top:20px; border:1px solid red">Eliminar Canción Permanentemente</button>
+    </div>
+
+    <div id="sec-settings" class="section">
+        <h3>⚙️ Ajustes</h3>
+        <p id="mode-status"></p>
+        
+        <button onclick="toggleDarkMode()" class="btn" style="background:#000000; color:#e0e0e0; border: 2px solid #999; margin-bottom:20px;">🌙 Modo Oscuro</button>
+        
+        <button onclick="logoutApp()" class="btn btn-cancel" style="border: 1px solid #ccc; margin-bottom: 20px;">🚪 Cerrar Sesión</button>
+    
+        <div class="instru-only">
+            <button onclick="loginAdmin()" id="btn-login-admin" class="btn btn-ok">Modo Edición</button>
+            <button onclick="logoutAdmin()" id="btn-logout-admin" class="btn btn-cancel" style="display:none">Cerrar Edición</button>
+        </div>
+
+        <div class="admin-only" style="margin-top:30px; text-align:left; border-top:2px solid #ddd; padding-top:15px">
+            <h4>🏷️ Gestionar Estilos</h4>
+            <div style="display:flex; gap:5px; margin-bottom:15px;">
+                <input type="text" id="new-style-name" placeholder="Nuevo estilo..." style="margin:0;">
+                <button class="btn btn-ok" onclick="addStyle()" style="width:auto; margin:0;">Añadir</button>
+            </div>
+            <div id="list-styles" style="margin-bottom:20px;"></div>
+        </div>
+
+        <div class="admin-only" style="margin-top:30px; text-align:left; border-top:2px solid #ddd; padding-top:15px">
+            <h4>📜 Historial de Cambios</h4>
+            <div id="log-list" style="font-size:12px; color:#666; max-height:300px; overflow-y:auto; background:#fff; padding:10px; border-radius:8px; border:1px solid #eee"></div>
+        </div>
+    </div>
+
+</div>
+    
+<nav id="nav-bar" style="display:none">
+    <button id="tab-songs" onclick="showSection('songs')" class="active">CANCIONES</button>
+    <button id="tab-misas" onclick="showSection('misas')">MISAS</button>
+    <button id="tab-settings" onclick="showSection('settings')">AJUSTES</button>
+</nav>
+
+<div id="pdf-container"></div>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyCm_U5XkQZ5nJ-stzmIYEZXpMUUwLFf4EE",
+        authDomain: "cancionero-juvenil-parroquial.firebaseapp.com",
+        projectId: "cancionero-juvenil-parroquial",
+        storageBucket: "cancionero-juvenil-parroquial.firebasestorage.app",
+        messagingSenderId: "1013357948678",
+        appId: "1:1013357948678:web:15bb29840934e793aa3887",
+        measurementId: "G-NFRZGNHTQ6",
+        databaseURL: "https://cancionero-juvenil-parroquial-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const PASS_CANTO = "canto2026"; // Contraseña de Canto
+    const PASS_INSTRU = "instru2026"; // Contraseña de Instrumento
+    const ADMIN_PINS = { "carlos@2026@3333": "Carlos", "mangel@2026@2222": "Miguel Ángel", "rodrig@2026@1111": "Rodrigo"};
+
+    let sortableInstance = null;
+    let sortableStyles = null; // Para arrastrar estilos
+    let songs = [], misas = [], logs = [];
+    let styles = ["Entrada", "Piedad", "Gloria", "Salmo", "Aleluya", "Ofertorio", "Santo", "Paz", "Comunión", "Salida"]; // Array por defecto
+    let viewMode = 'canto', currentUser = null, currentMisaIdx = null, currentSongIdx = null;
+
+    db.ref('data').on('value', snap => {
+        const v = snap.val(); 
+        if(v){ 
+            songs=v.songs||[]; 
+            misas=v.misas||[]; 
+            logs=v.logs||[]; 
+            if(v.styles) styles = v.styles; // Actualizar estilos desde nube si existen
+            renderSongsList(); 
+            renderMisas(); 
+            updateSelects(); // Actualiza selects con los estilos traidos
+            updateMisaSongSelector(); 
+            if(currentMisaIdx!==null) renderMisaSongs(); 
+            if(currentUser) renderStyles(); // Actualizar lista UI de estilos
+        }
+    });
+
+    function getTodayString() { return new Date().toLocaleDateString(); }
+
+    function checkSavedSession() {
+        const savedMode = localStorage.getItem('coroViewMode');
+        const savedDate = localStorage.getItem('coroDate');
+        if(savedMode && savedDate === getTodayString()) {
+            viewMode = savedMode;
+            enterApp();
+        }
+        
+        // --- COMPROBACIÓN DEL MODO OSCURO GUARDADO ---
+        if(localStorage.getItem('coroDarkMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+    }
+
+    // --- FUNCIÓN PARA ALTERNAR MODO OSCURO ---
+    function toggleDarkMode() {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('coroDarkMode', document.body.classList.contains('dark-mode'));
+    }
+
+    function checkAccess() {
+        const p = document.getElementById('pass-entrada').value;
+        if(p === PASS_CANTO) { viewMode = 'canto'; saveSessionAndEnter(); }
+        else if(p === PASS_INSTRU) { viewMode = 'instru'; saveSessionAndEnter(); }
+        else alert("Clave incorrecta");
+    }
+
+    function saveSessionAndEnter() {
+        localStorage.setItem('coroViewMode', viewMode);
+        localStorage.setItem('coroDate', getTodayString());
+        enterApp();
+    }
+
+    function logoutApp() {
+        localStorage.removeItem('coroViewMode');
+        localStorage.removeItem('coroDate');
+        location.reload();
+    }
+
+    function enterApp() {
+        document.body.className = 'mode-' + viewMode;
+        // Reaplicar el modo oscuro si estaba activo para que no se borre al cambiar la clase del body
+        if(localStorage.getItem('coroDarkMode') === 'true') document.body.classList.add('dark-mode');
+        
+        document.getElementById('gatekeeper').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('nav-bar').style.display = 'flex';
+        document.getElementById('app-logo').style.display = 'block';
+        document.getElementById('mode-status').innerText = "Viendo como: " + viewMode;
+        updateSelects(); 
+        updateUI();
+    }
+
+    function updateSelects() {
+        const ops = styles.map(s => `<option value="${s}">${s}</option>`).join("");
+        const fStyle = document.getElementById('f-style');
+        const filterStyle = document.getElementById('filter-style');
+        const filterStyleMisa = document.getElementById('filter-style-misa');
+        
+        if(fStyle) fStyle.innerHTML = ops;
+        if(filterStyle) filterStyle.innerHTML = `<option value="Todos">Todos</option>` + ops;
+        if(filterStyleMisa) filterStyleMisa.innerHTML = `<option value="Todos">Todos</option>` + ops;
+    }
+
+    function renderSongsList() {
+        const q = document.getElementById('search').value.toLowerCase();
+        const f = document.getElementById('filter-style').value;
+        const list = document.getElementById('list-songs'); 
+        list.innerHTML = "";
+        
+        songs.forEach((s, i) => {
+            const matchSearch = s.title.toLowerCase().includes(q);
+            const matchStyle = (f === "Todos" || s.style === f);
+            if(matchSearch && matchStyle) {
+                const d = document.createElement('div'); d.className = 'card';
+                d.innerHTML = `<b>${s.title}</b> <span class="tag">${s.style}</span>`;
+                d.onclick = () => { currentSongIdx=i; viewSong(i); };
+                list.appendChild(d);
+            }
+        });
+    }
+
+    checkSavedSession();
+
+    function sync() { db.ref('data').set({ songs, misas, logs, styles }); }
+
+    function showSection(id) {
+        document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+        document.getElementById('sec-' + id).classList.add('active');
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        let t = id; 
+        if(id==='view-song'||id==='form-song') t='songs'; 
+        if(id==='misa-detail') t='misas';
+        const tab = document.getElementById('tab-'+t);
+        if(tab) tab.classList.add('active');
+        if(id === 'misa-detail') updateMisaSongSelector();
+    }
+
+    function viewSong(i) {
+        const s = songs[i];
+        document.getElementById('v-title').innerText = s.title;
+        document.getElementById('v-tag').innerText = s.style;
+        document.getElementById('v-cejilla').innerText = "Cejilla: " + (s.cejilla || 0);
+        document.getElementById('v-content').innerHTML = (viewMode==='instru') ? (s.contentInstru || s.contentCanto) : s.contentCanto;
+        showSection('view-song');
+    }
+
+    function saveSong() {
+        const title = document.getElementById('f-title').value;
+        const s = { 
+            title: title, 
+            style: document.getElementById('f-style').value, 
+            cejilla: document.getElementById('f-cejilla').value, 
+            contentCanto: document.getElementById('f-content-canto').innerHTML, 
+            contentInstru: document.getElementById('f-content-instru').innerHTML 
+        };
+        let action = "";
+        if(currentSongIdx!==null) { songs[currentSongIdx] = s; action = `Editó "${title}"`; }
+        else { songs.push(s); action = `Creó "${title}"`; }
+        logs.push({ user: currentUser || "Desconocido", action: action, date: new Date().toLocaleString() });
+        sync(); 
+        showSection('songs');
+    }
+
+    function renderMisas() {
+        const l = document.getElementById('list-misas'); 
+        l.innerHTML = "";
+        misas.forEach((m, i) => {
+            const d = document.createElement('div'); d.className = 'card';
+            d.innerHTML = `<b>${m.name}</b> <span class="tag">${m.items?m.items.length:0} cantos</span>`;
+            d.onclick = () => { 
+                currentMisaIdx=i; 
+                document.getElementById('misa-name').innerText=m.name; 
+                renderMisaSongs(); 
+                showSection('misa-detail'); 
+            };
+            l.appendChild(d);
+        });
+    }
+
+    function renderMisaSongs() {
+        const c = document.getElementById('misa-songs-order');
+        if (!c) return;
+        if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
+        c.innerHTML = "";
+        const m = misas[currentMisaIdx];
+        if (!m || !m.items) return;
+
+        m.items.forEach((sIdx, pos) => {
+            const s = songs[sIdx];
+            if (!s) return;
+            const d = document.createElement('div');
+            d.className = 'card';
+            d.setAttribute('data-id', sIdx);
+            d.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <span class="admin-only handle" style="cursor:grab; margin-right:10px; padding:5px;">☰</span>
+                    <span>${s.title}</span>
+                </div>
+                <button class="admin-only" onclick="removeFromMisa(${pos})" style="color:var(--d); background:none; border:none; font-size:18px; padding:5px;">✖</button>
+            `;
+            d.onclick = (e) => {
+                if (e.target.classList.contains('admin-only') || e.target.tagName === 'BUTTON' || e.target.classList.contains('handle')) return;
+                currentSongIdx = sIdx;
+                viewSong(sIdx);
+            };
+            c.appendChild(d);
+        });
+
+        if (currentUser) {
+            sortableInstance = new Sortable(c, {
+                animation: 150,
+                handle: '.handle',
+                delay: 100,
+                delayOnTouchOnly: true,
+                onEnd: () => {
+                    const newOrder = [];
+                    c.querySelectorAll('.card').forEach(el => {
+                        newOrder.push(parseInt(el.getAttribute('data-id')));
+                    });
+                    misas[currentMisaIdx].items = newOrder;
+                    sync();
+                }
+            });
+        }
+        updateUI();
+    }
+
+    function addSongToMisa() {
+        const selector = document.getElementById('song-to-add');
+        if(!selector || currentMisaIdx === null) return;
+        
+        const songIdx = parseInt(selector.value);
+        if(isNaN(songIdx)) return;
+
+        if(!misas[currentMisaIdx].items) misas[currentMisaIdx].items = [];
+        
+        misas[currentMisaIdx].items.push(songIdx);
+        sync();
+        renderMisaSongs(); 
+    }
+
+    function removeFromMisa(p) { misas[currentMisaIdx].items.splice(p,1); sync(); renderMisaSongs(); }
+    function createNewMisa() { const n = prompt("Nombre de la Misa:"); if(n){ misas.push({name:n, items:[]}); sync(); } }
+    function deleteMisa() { if(confirm("¿Borrar esta misa?")){ misas.splice(currentMisaIdx, 1); sync(); showSection('misas'); } }
+
+    function loginAdmin() { const p = prompt("PIN de Edición:"); if(ADMIN_PINS[p]){ currentUser=ADMIN_PINS[p]; updateUI(); } else { alert("PIN incorrecto"); } }
+    function logoutAdmin() { currentUser=null; updateUI(); }
+    
+    function updateUI() {
+        const adm = currentUser !== null;
+        document.querySelectorAll('.admin-only').forEach(e => {
+            if(e.tagName === 'SPAN') e.style.display = adm ? 'inline-block' : 'none';
+            else e.style.display = adm ? 'block' : 'none';
+        });
+        document.querySelectorAll('.instru-only').forEach(e => e.style.display = viewMode === 'instru' ? 'inline-block' : 'none');
+        document.getElementById('btn-login-admin').style.display = adm ? 'none' : 'block';
+        document.getElementById('btn-logout-admin').style.display = adm ? 'block' : 'none';
+        if (adm) {
+            renderLogs();
+            renderStyles();
+        }
+    }
+    
+    function updateMisaSongSelector() {
+        const s = document.getElementById('song-to-add'); 
+        const q = document.getElementById('search-misa') ? document.getElementById('search-misa').value.toLowerCase() : "";
+        const f = document.getElementById('filter-style-misa') ? document.getElementById('filter-style-misa').value : "Todos";
+        
+        if(s) {
+            s.innerHTML = songs.map((x,i) => {
+                const matchSearch = x.title.toLowerCase().includes(q);
+                const matchStyle = (f === "Todos" || x.style === f);
+                if (matchSearch && matchStyle) return `<option value="${i}">${x.title}</option>`;
+                return "";
+            }).join("");
+        }
+    }
+    
+    // --- GESTIÓN DE ESTILOS ---
+    function renderStyles() {
+        const container = document.getElementById('list-styles');
+        if(!container) return;
+        
+        if (sortableStyles) { sortableStyles.destroy(); sortableStyles = null; }
+        container.innerHTML = "";
+        
+        styles.forEach((style, idx) => {
+            const d = document.createElement('div');
+            d.className = 'card';
+            d.style.padding = '10px'; d.style.marginBottom = '5px';
+            d.setAttribute('data-id', idx);
+            d.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <span class="handle-style" style="cursor:grab; margin-right:10px; padding:5px;">☰</span>
+                    <span>${style}</span>
+                </div>
+                <button onclick="deleteStyle(${idx})" style="color:var(--d); background:none; border:none; font-size:16px; cursor:pointer; padding:5px;">✖</button>
+            `;
+            container.appendChild(d);
+        });
+
+        if (currentUser) {
+            sortableStyles = new Sortable(container, {
+                animation: 150,
+                handle: '.handle-style',
+                delay: 100,
+                delayOnTouchOnly: true,
+                onEnd: () => {
+                    const newOrder = [];
+                    container.querySelectorAll('.card').forEach(el => {
+                        newOrder.push(styles[parseInt(el.getAttribute('data-id'))]);
+                    });
+                    styles = newOrder;
+                    sync();
+                    updateSelects(); // Refrescar los desplegables con el nuevo orden
+                }
+            });
+        }
+    }
+
+    function addStyle() {
+        const name = document.getElementById('new-style-name').value.trim();
+        if (name && !styles.includes(name)) {
+            styles.push(name);
+            document.getElementById('new-style-name').value = "";
+            sync();
+            updateSelects();
+        } else if (styles.includes(name)) {
+            alert("Este estilo ya existe.");
+        }
+    }
+
+    function deleteStyle(idx) {
+        if(confirm("¿Seguro que quieres borrar este estilo? Asegúrate de que no haya canciones usándolo.")) {
+            styles.splice(idx, 1);
+            sync();
+            updateSelects();
+        }
+    }
+    
+    function goBack() { showSection('songs'); }
+
+    // --- PDF ---
+    const optPDF = { margin: 10, filename: 'coro.pdf', html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+    function buildHTML(s) {
+        let c = viewMode==='instru' ? (s.contentInstru||s.contentCanto) : s.contentCanto;
+        return `<div style="page-break-inside:avoid"><h2>${s.title}</h2><p>${s.style}</p><div style="white-space:pre-wrap; font-family:monospace">${c}</div></div><hr>`;
+    }
+    function downloadSinglePDF() {
+        const p = document.getElementById('pdf-container'); p.innerHTML = buildHTML(songs[currentSongIdx]);
+        p.style.display='block'; html2pdf().set(optPDF).from(p).save().then(()=>p.style.display='none');
+    }
+    function generateMisaPDF(type) {
+        const p = document.getElementById('pdf-container'); let h = `<h1>${misas[currentMisaIdx].name}</h1>`;
+        if(type==='list' || type==='both') h += "<ul>" + misas[currentMisaIdx].items.map(i=>`<li>${songs[i].title}</li>`).join("") + "</ul>";
+        if(type==='both') { h += "<div style='page-break-after:always'></div>"; misas[currentMisaIdx].items.forEach(i=> h+=buildHTML(songs[i])); }
+        p.innerHTML = h; p.style.display='block'; html2pdf().set(optPDF).from(p).save().then(()=>p.style.display='none');
+    }
+
+
+    async function generateAllPDF() {
+    const p = document.getElementById('pdf-container');
+    p.innerHTML = ""; // Limpiar antes de empezar
+
+    //const logoBase64 = "data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjxzdmcgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeG1sbnM6c2VyaWY9Imh0dHA6Ly93d3cuc2VyaWYuY29tLyIgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgdmlld0JveD0iMCAwIDE0MCAyMDAiIHZlcnNpb249IjEuMSIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSIgc3R5bGU9ImZpbGwtcnVsZTpldmVub2RkO2NsaXAtcnVsZTpldmVub2RkO3N0cm9rZS1saW5lam9pbjpyb3VuZDtzdHJva2UtbWl0ZXJsaW1pdDoyOyI+CiAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLC01NDUuNDY3NTc2LC00Ny44NDUyMDgpIj4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLjEwNzMxNSwwLDAsMS4xMDczMTUsLTEzNy4wMTEwMDYsMTc2Ljg4NDA0OSkiPgogICAgICAgICAgICAgICAgPGNpcmNsZSBjeD0iODQuNSIgY3k9IjE4LjU4MyIgcj0iOS4wMzEiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvY2lyY2xlPgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEuMTA3MzE1LDAsMCwxLjEwNzMxNSwtMTM3LjAxMTAwNiwxMzYuODg0MDQ5KSI+CiAgICAgICAgICAgICAgICA8Y2lyY2xlIGN4PSI4NC41IiBjeT0iMTguNTgzIiByPSI5LjAzMSIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9jaXJjbGU+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSw1OTguOTEwNDI5LDApIj4KICAgICAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMS4xMDczMTUsMCwwLDEuMTA3MzE1LC0xMjcuMDExMDA2LDY2Ljg4NDA0OSkiPgogICAgICAgICAgICAgICAgPGNpcmNsZSBjeD0iODQuNSIgY3k9IjE4LjU4MyIgcj0iOS4wMzEiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvY2lyY2xlPgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEuMTA3MzE1LDAsMCwxLjEwNzMxNSwtNzcuMDExMDA2LDM3LjI2Nzc3MykiPgogICAgICAgICAgICAgICAgPGNpcmNsZSBjeD0iODQuNSIgY3k9IjE4LjU4MyIgcj0iOS4wMzEiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvY2lyY2xlPgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEuMTA3MzE1LDAsMCwxLjEwNzMxNSwtNzcuMDExMDA2LDIxNi44ODQwNDkpIj4KICAgICAgICAgICAgICAgIDxjaXJjbGUgY3g9Ijg0LjUiIGN5PSIxOC41ODMiIHI9IjkuMDMxIiBzdHlsZT0iZmlsbDpyZ2IoMTMyLDIsMik7Ij48L2NpcmNsZT4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLjEwNzMxNSwwLDAsMS4xMDczMTUsLTEwNy4wMTEwMDYsMTE2Ljg4NDA0OSkiPgogICAgICAgICAgICAgICAgPGNpcmNsZSBjeD0iODQuNSIgY3k9IjE4LjU4MyIgcj0iOS4wMzEiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvY2lyY2xlPgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEuMTA3MzE1LDAsMCwxLjEwNzMxNSwtMTA3LjAxMTAwNiwxOTYuODg0MDQ5KSI+CiAgICAgICAgICAgICAgICA8Y2lyY2xlIGN4PSI4NC41IiBjeT0iMTguNTgzIiByPSI5LjAzMSIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9jaXJjbGU+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSw1OTguOTEwNDI5LDApIj4KICAgICAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoLTEuMTA3MzE1LDAsMCwxLjEwNzMxNSwxNzAuMTI1MywxNzYuODg0MDQ5KSI+CiAgICAgICAgICAgICAgICA8Y2lyY2xlIGN4PSI4NC41IiBjeT0iMTguNTgzIiByPSI5LjAzMSIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9jaXJjbGU+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSw1OTguOTEwNDI5LDApIj4KICAgICAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoLTEuMTA3MzE1LDAsMCwxLjEwNzMxNSwxNzAuMTI1MywxMzYuODg0MDQ5KSI+CiAgICAgICAgICAgICAgICA8Y2lyY2xlIGN4PSI4NC41IiBjeT0iMTguNTgzIiByPSI5LjAzMSIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9jaXJjbGU+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSw1OTguOTEwNDI5LDApIj4KICAgICAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoLTEuMTA3MzE1LDAsMCwxLjEwNzMxNSwxNjAuMTI1Myw2Ni44ODQwNDkpIj4KICAgICAgICAgICAgICAgIDxjaXJjbGUgY3g9Ijg0LjUiIGN5PSIxOC41ODMiIHI9IjkuMDMxIiBzdHlsZT0iZmlsbDpyZ2IoMTMyLDIsMik7Ij48L2NpcmNsZT4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgtMS4xMDczMTUsMCwwLDEuMTA3MzE1LDE0MC4xMjUzLDExNi44ODQwNDkpIj4KICAgICAgICAgICAgICAgIDxjaXJjbGUgY3g9Ijg0LjUiIGN5PSIxOC41ODMiIHI9IjkuMDMxIiBzdHlsZT0iZmlsbDpyZ2IoMTMyLDIsMik7Ij48L2NpcmNsZT4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgtMS4xMDczMTUsMCwwLDEuMTA3MzE1LDE0MC4xMjUzLDE5Ni44ODQwNDkpIj4KICAgICAgICAgICAgICAgIDxjaXJjbGUgY3g9Ijg0LjUiIGN5PSIxOC41ODMiIHI9IjkuMDMxIiBzdHlsZT0iZmlsbDpyZ2IoMTMyLDIsMik7Ij48L2NpcmNsZT4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLC01ODAuNTkwNzY3LDApIj4KICAgICAgICAgICAgICAgIDxyZWN0IHg9IjU4Ny4xNDgiIHk9IjU3Ljg0NSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE3OS42MTYiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvcmVjdD4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLC01ODAuNTkwNzY3LDApIj4KICAgICAgICAgICAgICAgIDxyZWN0IHg9IjU0Ny4xNDgiIHk9Ijc3LjQ2MSIgd2lkdGg9IjEwMCIgaGVpZ2h0PSIyMCIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9yZWN0PgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsLTU4MC41OTA3NjcsMCkiPgogICAgICAgICAgICAgICAgPHJlY3QgeD0iNTU3LjE0OCIgeT0iMTM3LjQ2MSIgd2lkdGg9IjIwIiBoZWlnaHQ9IjgwIiBzdHlsZT0iZmlsbDpyZ2IoMTMyLDIsMik7Ij48L3JlY3Q+CiAgICAgICAgICAgIDwvZz4KICAgICAgICA8L2c+CiAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSw1OTguOTEwNDI5LDApIj4KICAgICAgICAgICAgPGcgdHJhbnNmb3JtPSJtYXRyaXgoMSwwLDAsMSwtNTgwLjU5MDc2NywwKSI+CiAgICAgICAgICAgICAgICA8cmVjdCB4PSI1MjcuMTQ4IiB5PSIxNTcuNDYxIiB3aWR0aD0iMjAiIGhlaWdodD0iNDAiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvcmVjdD4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLDU5OC45MTA0MjksMCkiPgogICAgICAgICAgICA8ZyB0cmFuc2Zvcm09Im1hdHJpeCgxLDAsMCwxLC01ODAuNTkwNzY3LDApIj4KICAgICAgICAgICAgICAgIDxyZWN0IHg9IjYxNy4xNDgiIHk9IjEzNy40NjEiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4MCIgc3R5bGU9ImZpbGw6cmdiKDEzMiwyLDIpOyI+PC9yZWN0PgogICAgICAgICAgICA8L2c+CiAgICAgICAgPC9nPgogICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDEsMCwwLDEsNTk4LjkxMDQyOSwwKSI+CiAgICAgICAgICAgIDxnIHRyYW5zZm9ybT0ibWF0cml4KDAuOTg0ODI3LDAsMCwxLC01NzAuNzcxOTAyLDApIj4KICAgICAgICAgICAgICAgIDxyZWN0IHg9IjY0Ny4xNDgiIHk9IjE1Ny40NjEiIHdpZHRoPSIyMC4zMDgiIGhlaWdodD0iNDAiIHN0eWxlPSJmaWxsOnJnYigxMzIsMiwyKTsiPjwvcmVjdD4KICAgICAgICAgICAgPC9nPgogICAgICAgIDwvZz4KICAgIDwvZz4KPC9zdmc+Cg==";
+    // 1. Ordenar canciones
+    let contentSongs = [...songs].sort((a, b) => {
+        let styleDiff = styles.indexOf(a.style) - styles.indexOf(b.style);
+        if (styleDiff !== 0) return styleDiff;
+        return a.title.localeCompare(b.title);
+    });
+
+    contentSongs.forEach((s, index) => s.numeroCanto = index + 1);
+
+    // --- CONSTRUCCIÓN DEL HTML ---
+    let h = "";
+
+    // A. PORTADA
+    h += `
+    <div style="height: 280mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-after: always;">
+        <img src="Logo-Coro-Juvenil.png" style="width: 80mm; margin-bottom: 20px;">
+        <h1 style="font-size: 40px; margin: 0;">Cancionero Juvenil</h1>
+        <h2 style="font-size: 24px; color: #555;">Iglesia en Mengíbar</h2>
+    </div>`;
+
+    // B. ÍNDICE (Sin enlaces)
+    let indexSongs = [...contentSongs].sort((a, b) => a.title.localeCompare(b.title));
+    h += `
+    <div style="page-break-after: always; padding: 10mm;">
+        <h2 style="border-bottom: 2px solid #000; padding-bottom: 10px;">Índice Alfabético</h2>
+        <ul style="column-count: 2; font-size: 14px; line-height: 1.8; list-style-type: none; padding: 0;">`;
+    
+    indexSongs.forEach(s => {
+        h += `<li style="margin-bottom: 5px;"><b>${s.numeroCanto}.</b> ${s.title}</li>`;
+    });
+    h += `</ul></div>`;
+
+    // C. CUERPO DE CANCIONES (Una por hoja)
+    contentSongs.forEach(s => {
+        let c = viewMode === 'instru' ? (s.contentInstru || s.contentCanto) : s.contentCanto;
+        
+        h += `
+        <div class="pdf-song-page" style="page-break-after: always; position: relative; min-height: 270mm; padding: 10mm; border-top: 1px solid #eee;">
+            <img src="Logo-Coro-Juvenil.png" style="position: absolute; top: 10mm; right: 10mm; width: 10mm; opacity: 0.6;">
+            
+            <div style="margin-bottom: 15px;">
+                <span style="font-weight:bold; color:#666; text-transform:uppercase; font-size:11px;">${s.style}</span>
+            </div>
+            
+            <h2 style="margin-top:0; color:black; font-size: 24px; border-bottom: 1px solid #eee; padding-bottom: 5px;">
+                ${s.numeroCanto}. ${s.title}
+            </h2>
+            
+            <div style="white-space:pre-wrap; font-family:'Fira Code', monospace; font-size:11px; color:black; line-height: 1.4;">${c}</div>
+        </div>`;
+    });
+
+    p.innerHTML = h;
+    p.style.display = 'block';
+
+    // 4. CONFIGURACIÓN DEL PDF
+    const opt = {
+        margin: [0, 0, 0, 0], // Margen manual en el HTML para control total
+        filename: 'Cancionero_Juvenil_Mengibar.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(opt).from(p).toPdf().get('pdf').then(function (pdf) {
+        const totalPages = pdf.internal.getNumberOfPages();
+        
+        // El índice suele ocupar 1 página + 1 de portada = empezamos en la 3
+        // Pero para ser exactos, calculamos cuándo empiezan las canciones
+        // En este diseño: Portada (1), Índice (2). Las canciones empiezan en la 3.
+        
+        let actualSongPage = 1;
+        let lastSongTitle = ""; 
+
+        // Empezamos el bucle de páginas físicas
+        for (let i = 1; i <= totalPages; i++) {
+            if (i <= 2) continue; // Saltamos Portada e Índice en el numerado
+
+            pdf.setPage(i);
+            pdf.setFontSize(10);
+            pdf.setTextColor(150);
+
+            // Pie de página: Página X (empezando desde las canciones)
+            // Si quieres que las páginas de una misma canción larga tengan el mismo número:
+            // Es complejo detectar el contenido, así que usaremos el número de página relativa:
+            pdf.text('Página ' + actualSongPage, 105, 287, { align: 'center' });
+            
+            actualSongPage++;
+        }
+    }).save().then(() => {
+        p.style.display = 'none';
+        p.innerHTML = ""; 
+    });
+}
+    
+    function openSongForm(i=null) {
+        currentSongIdx = i;
+        if(i!==null){
+            const s = songs[i]; 
+            document.getElementById('f-title').value=s.title; 
+            document.getElementById('f-cejilla').value=s.cejilla;
+            document.getElementById('f-content-canto').innerHTML=s.contentCanto; 
+            document.getElementById('f-content-instru').innerHTML=s.contentInstru;
+        } else {
+            document.getElementById('f-title').value=""; 
+            document.getElementById('f-cejilla').value=0;
+            document.getElementById('f-content-canto').innerHTML=""; 
+            document.getElementById('f-content-instru').innerHTML="";
+        }
+        showSection('form-song');
+    }
+    
+    function editSong() { openSongForm(currentSongIdx); }
+
+    function renderLogs() {
+        const container = document.getElementById('log-list');
+        if(!container) return;
+        container.innerHTML = logs.slice(-15).reverse().map(l => `<div style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:3px"><b>${l.user}</b>: ${l.action} <br> <small>${l.date}</small></div>`).join("");
+    }
+
+    function deleteSong() {
+        if(currentSongIdx === null) return;
+        if(confirm("¿Estás SEGURO de eliminar esta canción?")) {
+            const deletedIdx = currentSongIdx;
+            logs.push({ user: currentUser, action: `Eliminó "${songs[deletedIdx].title}"`, date: new Date().toLocaleString() });
+            misas.forEach(m => {
+                if(m.items) {
+                    m.items = m.items.filter(id => id !== deletedIdx);
+                    m.items = m.items.map(id => id > deletedIdx ? id - 1 : id);
+                }
+            });
+            songs.splice(deletedIdx, 1);
+            sync();
+            showSection('songs');
+        }
+    }
+</script>
+</body>
+</html>
