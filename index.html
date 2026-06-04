@@ -202,28 +202,25 @@
 <div id="pdf-container"></div>
 
 <script>
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCWixk-nH5JEI34IvkYYyPx7D-VUMYXwi8",
-  authDomain: "coro-joven-iglesia-en-mengibar.firebaseapp.com",
-  databaseURL: "https://coro-joven-iglesia-en-mengibar-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "coro-joven-iglesia-en-mengibar",
-  storageBucket: "coro-joven-iglesia-en-mengibar.firebasestorage.app",
-  messagingSenderId: "9046050722",
-  appId: "1:9046050722:web:584918152a588bb42014fb",
-  measurementId: "G-R9YMD9R6K1"
-};
+<script>
+// 2. Tu configuración de Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyCWixk-nH5JEI34IvkYYyPx7D-VUMYXwi8",
+      authDomain: "coro-joven-iglesia-en-mengibar.firebaseapp.com",
+      databaseURL: "https://coro-joven-iglesia-en-mengibar-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "coro-joven-iglesia-en-mengibar",
+      storageBucket: "coro-joven-iglesia-en-mengibar.firebasestorage.app",
+      messagingSenderId: "9046050722",
+      appId: "1:9046050722:web:584918152a588bb42014fb",
+      measurementId: "G-R9YMD9R6K1"
+    };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+    // 3. Inicializa Firebase usando el objeto global 'firebase' que cargaste en el HTML
+    firebase.initializeApp(firebaseConfig);
+
+    // 4. Define la variable 'db' llamando al servicio de base de datos
+    const db = firebase.database();
 
     const PASS_CANTO = "canto2026"; // Contraseña de Canto
     const PASS_INSTRU = "instru2026"; // Contraseña de Instrumento
