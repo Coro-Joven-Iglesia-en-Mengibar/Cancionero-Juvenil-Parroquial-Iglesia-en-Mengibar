@@ -85,7 +85,7 @@
     <img src="Logo Coro Juvenil (W).svg" class="logo-main">
     <h2>Cancionero Juvenil Parroquial</h2>
     <h3>Iglesia en Mengíbar</h3>
-    <input type="password" id="pass-entrada" placeholder="Contraseña...">
+    <input type="password" id="pass-entrada" placeholder="Contraseña..." onkeydown="if(event.key === 'Enter') checkAccess()">
     <button onclick="checkAccess()" class="btn btn-ok" style="width:200px">Entrar</button>
 </div>
 
